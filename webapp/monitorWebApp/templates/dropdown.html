@@ -1,0 +1,72 @@
+{% load staticfiles %}
+<!DOCTYPE html>
+<html>
+
+  <head>
+  
+    
+    <link href="http://s3.amazonaws.com/codecademy-content/courses/ltp/css/shift.css" rel="stylesheet">
+    <link rel="stylesheet" href="http://s3.amazonaws.com/codecademy-content/courses/ltp/css/bootstrap.css">
+    
+    <link rel ="stylesheet" type="text/css" href="{% static "css/default.css" %}">
+    <script type="text/javascript" src="http://code.jquery.com/jquery.min.js"></script>
+    <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+    {%block header%}{%endblock%}
+    
+  </head>
+
+  <body>
+  
+	<div class="dropdownmenu">
+	    <ul class="nav nav-pills">
+	        <li class="active"><a href="/monitorWebApp/main">Home</a></li>	        
+	        <li class="dropdown">
+	            <a href="/monitorWebApp/main" data-toggle="dropdown" class="dropdown-toggle">Configure VM Parameter <b class="caret"></b></a>
+	            <ul class="dropdown-menu">
+	                <li><a href="/monitorWebApp/configure">Configure VM</a></li>
+	            </ul>
+	        </li>
+	        <li class="dropdown">
+	            <a href="/monitorWebApp/main" data-toggle="dropdown" class="dropdown-toggle">Network Delay <b class="caret"></b></a>
+	            <ul class="dropdown-menu">
+	                <li><a href="/monitorWebApp/test">Display Performance Result</a></li>
+	            </ul>
+	        </li>  
+	        
+	        </li>
+	        <li class="dropdown">
+	            <a href="/monitorWebApp/main" data-toggle="dropdown" class="dropdown-toggle">Network Bandwidth <b class="caret"></b></a>
+	            <ul class="dropdown-menu">
+	                <li><a href="#">Display Performance Result</a></li>
+	            </ul>
+	        </li> 
+	        
+	        <li class="dropdown">
+	            <a href="/monitorWebApp/main" data-toggle="dropdown" class="dropdown-toggle">Packet Loss <b class="caret"></b></a>
+	            <ul class="dropdown-menu">
+	                <li><a href="#">Display Performance Result</a></li>
+	            </ul>
+	        </li>
+	        
+	        <ul class = "pull-right">
+	        <li><a href="#">Sign Up</a></li> 
+	        <li class="dropdown">
+	            <a href="#" data-toggle="dropdown" class="dropdown-toggle">Admin <b class="caret"></b></a>
+	            <ul class="dropdown-menu">
+	                <li><a href="/admin">Sign In</a></li>
+	                <li><a href="#">Settings</a></li>
+	            </ul>
+	        </li>
+	        <li><a href="#">Contact</a></li>
+	        <li><a href="#">Help</a></li>    
+	        </ul>
+	        
+	    </ul>
+	</div>
+	
+	<div id="content">
+		{%block content%}This is the content area of every webpage{%endblock%}
+
+	</div>
+</body>
+</html>

@@ -1,0 +1,101 @@
+{% extends "dropdown.html" %}
+{% load staticfiles %}
+<!DOCTYPE html>
+<html>
+
+  <head>
+  {% block header %}
+  
+    <title>Cloud Network Monitor - University of Toronto</title>
+    
+  {% endblock %}
+  </head>
+
+
+{% block content %}
+
+  <body>
+
+    <div class="jumbotron">
+      <div class="container">
+        <h1>Welcome to the Cloud Network Monitor web application!</h1>
+        <p>A web interface for monitoring network performance of cloud VMs.</p>
+        <a href="#" target="_blank">Learn More</a>
+      </div>
+    </div> 
+
+    <div class = "usage-guide">
+      <div class = "container">
+        <h2>Usage Guides</h2>
+        <p>Not sure where to start? We've created the usage guides of this website.<p>
+        <div class = "row">
+        
+          <div class="col-md-4">
+            <div class="thumbnails">
+			    <a href="#" class="thumbnail">
+			      <img src="{%static "image/configureVM.jpg" %}" >
+			    </a>
+			</div>
+            <div class="thumbnails">
+			    <a href="#" class="thumbnail">
+			      <img src="{%static "image/networkDelay.jpg" %}" >
+			    </a>
+			</div>
+          </div>
+          
+          <div class="col-md-4">
+			<div class="thumbnails">
+			    <a href="#" class="thumbnail">
+			      <img src="{%static "image/networkBandwidth.jpg" %}" >
+			    </a>
+			</div>
+            <div class="thumbnails">
+			    <a href="#" class="thumbnail">
+			      <img src="{%static "image/packetLoss.jpg" %}">
+			    </a>
+			</div>
+          </div>
+          
+          <div class="col-md-4">
+            <div class="thumbnails">
+			    <a href="#" class="thumbnail">
+			      <img src="{%static "image/cloud.jpg" %}">
+			    </a>
+			</div>
+          </div>
+          
+      </div>
+    </div>
+
+    <div class="learn-more">
+	  <div class="container">
+		<div class = "row">
+		
+		
+          <div class="col-md-4">
+			<h3>Network Delay</h3>
+			<p>The delay of a network specifies how long it takes for a bit of data to travel across the network from one node or endpoint to another.</p>
+			<p><a href="http://en.wikipedia.org/wiki/Network_delay"  target="_blank">Learn more</a></p>
+	      </div>
+	      
+	      
+          <div class="col-md-4">
+			<h3>Network Bandwidth</h3>
+			<p>The bandwidth of a network is the amount of data that can be carried from one point to another in a given time period.</p>
+			<p><a href="http://en.wikipedia.org/wiki/Bandwidth_%28computing%29" target="_blank">Learn more</a></p>
+		  </div>
+		  
+		  
+          <div class="col-md-4">
+			<h3>Packet Loss</h3>
+			<p>Packet loss occurs when one or more packets of data travelling across a computer network fail to reach their destination.</p>
+			<p><a href="http://en.wikipedia.org/wiki/Packet_loss" target="_blank">Learn more</a></p>
+		  </div>
+		  
+	    </div>
+	  </div>
+	</div>
+	
+  </body>
+</html>
+{% endblock %}
