@@ -1,0 +1,161 @@
+{% extends "dropdown.html" %}
+
+{% load staticfiles %}
+<!DOCTYPE html>
+<meta charset="utf-8">
+<head>
+  {% block header %}
+  
+  	<link rel ="stylesheet" type="text/css" href="{% static "css/table.css" %}"/>
+  	
+    <title>View Network Packet Loss</title>
+    
+  {% endblock %}
+</head>
+<style>
+
+body {
+  font: 10px sans-serif;
+}
+
+.axis path,
+.axis line {
+  fill: none;
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+
+.bar {
+  fill: steelblue;
+}
+
+.x.axis path {
+  display: none;
+}
+
+</style>
+{% block content %}
+
+<body>
+
+		<center id="green">Network Packet Loss Result:</center>
+		
+		<div>
+			<table id= "t0">
+				<tr>
+					{% for item in vm_numbers %}
+						{% if item == vm_select%}
+							<td id="selected" class = "delete_sort"><a id = "normal" href="/monitorWebApp/packet_loss/{{item}}"><span>{{item}}</span></a></td>
+							
+						{% else %}
+							<td id="unselected" class = "delete_sort"><a id = "normal" href="/monitorWebApp/packet_loss/{{item}}"><span>{{item}}</span></a></td>
+						{% endif %}
+					{% endfor %}
+				</tr>
+				
+			</table>
+		</div>
+
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script>
+
+var margin = {top: 20, right: 50, bottom: 20, left: 50},
+    width = 1350 - margin.left - margin.right,
+    height = 500 - margin.top - margin.bottom;
+
+var x = d3.scale.ordinal()
+    .rangeRoundBands([0, width], .1);
+
+var y = d3.scale.linear()
+    .rangeRound([height, 0]);
+
+var color = d3.scale.ordinal()
+	.range(["#CC2900", "#0052CC", "#CCCC00", "#007A00", "#CC7A00", "#A352CC", "#663300"]);
+
+
+var xAxis = d3.svg.axis()
+    .scale(x)
+    .orient("bottom");
+
+var yAxis = d3.svg.axis()
+    .scale(y)
+    .orient("left")
+    .tickFormat(d3.format(".2s"));
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+  .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+d3.csv("{%static "data/packetLoss/lost_output.csv" %}", function(error, data) {
+  color.domain(d3.keys(data[0]).filter(function(key) { return key !== "Time"; }));
+
+  data.forEach(function(d) {
+    var y0 = 0;
+    d.ages = color.domain().map(function(name) { return {name: name, y0: y0, y1: y0 += +d[name]}; });
+    d.total = d.ages[d.ages.length - 1].y1;
+  });
+
+
+  x.domain(data.map(function(d) { return d.Time; }));
+  y.domain([0, d3.max(data, function(d) { return d.total; })]);
+
+  svg.append("g")
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + height + ")")
+      .call(xAxis)
+  	 .append("text")
+  	  .attr("transform", "translate(1300)")
+  	  .style("text-anchor", "end")
+      .text("min");
+
+  svg.append("g")
+      .attr("class", "y axis")
+      .call(yAxis)
+    .append("text")
+      .attr("transform", "rotate(-90)")
+      .attr("y", 6)
+      .attr("dy", ".71em")
+      .style("text-anchor", "end")
+      .text("Packet Loss (%)");
+
+  var state = svg.selectAll(".state")
+      .data(data)
+    .enter().append("g")
+      .attr("class", "g")
+      .attr("transform", function(d) { return "translate(" + x(d.Time) + ",0)"; });
+
+  state.selectAll("rect")
+      .data(function(d) { return d.ages; })
+    .enter().append("rect")
+      .attr("width", x.rangeBand())
+      .attr("y", function(d) { return y(d.y1); })
+      .attr("height", function(d) { return y(d.y0) - y(d.y1); })
+      .style("fill", function(d) { return color(d.name); });
+
+  var legend = svg.selectAll(".legend")
+      .data(color.domain().slice().reverse())
+    .enter().append("g")
+      .attr("class", "legend")
+      .attr("transform", function(d, i) { return "translate(0," + i * 20 + ")"; });
+
+  legend.append("rect")
+      .attr("x", width - 0)
+      .attr("width", 18)
+      .attr("height", 18)
+      .style("fill", color);
+
+  legend.append("text")
+      .attr("x", width - 5)
+      .attr("y", 9)
+      .attr("dy", ".35em")
+      .style("text-anchor", "end")
+      .text(function(d) { return d; });
+
+});
+
+</script>
+</body>
+</html>
+{% endblock %}
