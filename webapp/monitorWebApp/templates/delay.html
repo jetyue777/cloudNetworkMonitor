@@ -9,6 +9,13 @@
   	<link rel ="stylesheet" type="text/css" href="{% static "css/table.css" %}"/>
   	
     <title>View Network Delay</title>
+    {% if first == "yes" %}
+    	<meta http-equiv="refresh" content="0">
+    {% else %}
+    	<meta http-equiv="refresh" content="20">
+    	
+    {% endif %}
+    
     
   {% endblock %}
 </head>

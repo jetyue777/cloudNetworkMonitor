@@ -10,6 +10,13 @@
   	
     <title>View Network Packet Loss</title>
     
+    {% if first == "yes" %}
+    	<meta http-equiv="refresh" content="0">
+    {% else %}
+    	<meta http-equiv="refresh" content="10">
+    	
+    {% endif %}
+    
   {% endblock %}
 </head>
 <style>

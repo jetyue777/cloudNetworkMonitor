@@ -12,11 +12,13 @@ from webapp.settings import BASE_DIR
 # Create your views here.
 def main (request):
     request.session["vm_time_counter"] = str(0.0)
-    if not request.session["vm_select"]:
+        
+    if not request.session.get('vm_select', None):
         request.session["vm_select"] = "vm1"
     
-    
-    
+    request.session["empty"] = "yes"
+    request.session["old"] = "main"
+        
     args = {}
     args.update(csrf(request))
     
@@ -120,6 +122,11 @@ def configure (request):
 
 def delay (request, vm_select="vm1"):
     
+    request.session["current"] = "delay"
+    current = request.session["current"]
+    
+    old = request.session["old"]
+    
     print "+++++++++++++++++++++++++"
     print vm_select
     
@@ -168,9 +175,10 @@ def delay (request, vm_select="vm1"):
     
     
     vm_time_counter = float(request.session["vm_time_counter"])
-
+    
+    
     #################construct remove_ping_csv.sh shell script##############
-    if vm_select != vm_select_old or (vm_select == "vm1" and vm_select_old =="vm1" and vm_time_counter == 0.0):
+    if vm_select != vm_select_old or (vm_select == "vm1" and vm_select_old =="vm1" and vm_time_counter == 0.0) or current != old:
         request.session["vm_time_counter"] = str(0.0)
 
         if not os.path.exists(os.path.dirname(remove_file_name)):
@@ -182,83 +190,107 @@ def delay (request, vm_select="vm1"):
         subprocess.check_call(["bash", remove_file_name])
 
     
-    #set global counter
-    vm_time_counter = float(request.session["vm_time_counter"])
-    vm_time_counter += 1
-    request.session["vm_time_counter"] = str(vm_time_counter)
-    
+    if (request.session["empty"] == "yes" or vm_select != vm_select_old or current != old):
+        print "inside if+++++++++++++++++++++++++"
+        first = "yes"
+        delay_file_name = os.path.join(BASE_DIR, 'static', 'data', 'delay', 'ping_output.csv')
+        if not os.path.exists(os.path.dirname(delay_file_name)):
+            os.makedirs(os.path.dirname(delay_file_name))
+        with open(delay_file_name, "wb") as f:
+            text = "Time,"    
+            i = 0
+            while(i < vm_total_num):
+                if(i!=vm_index):
+                    text = text+"vm"+str(i+1)+","
+                i += 1
+            text = text[:-1]
+            text = text + "\n"
+            f.write(text)
         
-    #################construct remote_ping.sh shell script########################
-    if not os.path.exists(os.path.dirname(remote_file_name)):
-        print "remote_ping.sh does not exist"
-        os.makedirs(os.path.dirname(remote_file_name))
-    with open(remote_file_name, "wb") as f:
-        print "rewrite remote_ping.sh==========================="
-        f.write("if [ -f ping_output.csv ];\n")
-        f.write("then\n")
-        f.write("\techo \"File $FILE exists\"\n")
-        f.write("else\n")
-        f.write("\techo \"File $FILE does not exists\"\n")
-        text = "\techo \"Time,"
-        #f.write("\techo \"Time,vm2,vm3\" >> ping_output.csv\n")
-
-        i = 0
-        while(i < vm_total_num):
-            if(i!=vm_index):
-                text = text+"vm"+str(i+1)+","
-            i += 1
-        text = text[:-1]
-        text = text + "\" >> ping_output.csv\n"
-        f.write(text)
-        
-        f.write("fi\n")
-        f.write("\n")
-        ###########need to change to loop structure#########
-        i = 0
-        ping_list = []
-        while(i<vm_total_num):
-            if (i!= vm_index):  
-                f.write("vm"+str(i+1)+"_ping=$(ping -c 2 " + vm_set[i][0] + "| awk '/rtt/ {print $4}'| awk -F'/' '{print $2}');\n")
-                ping_list.append("vm"+str(i+1)+"_ping")
-            i += 1   
-                
+    else:
+        print "inside else++++++++++++++++++++++++"
+        first = "no"
+        #set global counter
+        vm_time_counter = float(request.session["vm_time_counter"])
+        vm_time_counter += 1
+        request.session["vm_time_counter"] = str(vm_time_counter)
             
-        f.write("\n")
-        ####################################################
-        f.write("comma=\",\"\n")
-        #f.write("full=\"$1$comma$first_ping$comma$second_ping\"\n")
-        text2 = "full=\"$1$comma"
-        for ping in ping_list:
-            text2 = text2 + "$"+ping+"$comma"
-        text2 = text2[:-6]
-        text2 = text2 + "\"\n"
-        f.write(text2)
-        f.write("echo $full >> ping_output.csv\n")
-        
-    #################construct local.sh shell script########################
-    if not os.path.exists(os.path.dirname(local_file_name)):
-        print "local.sh does not exist"
-        os.makedirs(os.path.dirname(local_file_name))
-    with open(local_file_name, "wb") as f:
-        print "rewrite local.sh====================="
-        #f.write("ssh-keygen -R " + vm_set[vm_index][0] + "\n")
-        #f.write("ssh-keyscan -H " + vm_set[vm_index][0] + " >> ~/.ssh/known_hosts\n")
-        f.write("#below is vm host ip address\n")
-        host_vm = vm_set[vm_index][1]+"@"+vm_set[vm_index][0]
-        f.write("ssh " + host_vm +" 'bash -s' < "+ remote_file_name +" $1\n")
-        f.write("\n")
-        f.write("#remove local bandwidth log file\n")
-        #f.write("rm -f *.csv\n") ################fix me?#####################
-        f.write("\n")
-        f.write("#copy remote bandwidth output log file to local machine\n")
-        f.write("#below is vm host ip address\n")
-        delay_data_path = os.path.join(BASE_DIR, 'static', 'data', 'delay')
-        f.write("scp " + host_vm + ":~/ping_output.csv " + delay_data_path + "\n")
-        
+        #################construct remote_ping.sh shell script########################
+        if not os.path.exists(os.path.dirname(remote_file_name)):
+            print "remote_ping.sh does not exist"
+            os.makedirs(os.path.dirname(remote_file_name))
+        with open(remote_file_name, "wb") as f:
+            print "rewrite remote_ping.sh==========================="
+            f.write("if [ -f ping_output.csv ];\n")
+            f.write("then\n")
+            f.write("\techo \"File $FILE exists\"\n")
+            f.write("else\n")
+            f.write("\techo \"File $FILE does not exists\"\n")
+            text = "\techo \"Time,"
+            #f.write("\techo \"Time,vm2,vm3\" >> ping_output.csv\n")
     
-    #############run local.sh in server####################
-    subprocess.check_call(["bash", local_file_name, str(vm_time_counter/2)])
- 
+            i = 0
+            while(i < vm_total_num):
+                if(i!=vm_index):
+                    text = text+"vm"+str(i+1)+","
+                i += 1
+            text = text[:-1]
+            text = text + "\" >> ping_output.csv\n"
+            f.write(text)
+            
+            f.write("fi\n")
+            f.write("\n")
+            ###########need to change to loop structure#########
+            i = 0
+            ping_list = []
+            while(i<vm_total_num):
+                if (i!= vm_index):  
+                    f.write("vm"+str(i+1)+"_ping=$(ping -c 2 " + vm_set[i][0] + "| awk '/rtt/ {print $4}'| awk -F'/' '{print $2}');\n")
+                    ping_list.append("vm"+str(i+1)+"_ping")
+                i += 1   
+                    
+                
+            f.write("\n")
+            ####################################################
+            f.write("comma=\",\"\n")
+            #f.write("full=\"$1$comma$first_ping$comma$second_ping\"\n")
+            text2 = "full=\"$1$comma"
+            for ping in ping_list:
+                text2 = text2 + "$"+ping+"$comma"
+            text2 = text2[:-6]
+            text2 = text2 + "\"\n"
+            f.write(text2)
+            f.write("echo $full >> ping_output.csv\n")
+            
+        #################construct local.sh shell script########################
+        if not os.path.exists(os.path.dirname(local_file_name)):
+            print "local.sh does not exist"
+            os.makedirs(os.path.dirname(local_file_name))
+        with open(local_file_name, "wb") as f:
+            print "rewrite local.sh====================="
+            #f.write("ssh-keygen -R " + vm_set[vm_index][0] + "\n")
+            #f.write("ssh-keyscan -H " + vm_set[vm_index][0] + " >> ~/.ssh/known_hosts\n")
+            f.write("#below is vm host ip address\n")
+            host_vm = vm_set[vm_index][1]+"@"+vm_set[vm_index][0]
+            f.write("ssh " + host_vm +" 'bash -s' < "+ remote_file_name +" $1\n")
+            f.write("\n")
+            f.write("#remove local bandwidth log file\n")
+            #f.write("rm -f *.csv\n") ################fix me?#####################
+            f.write("\n")
+            f.write("#copy remote bandwidth output log file to local machine\n")
+            f.write("#below is vm host ip address\n")
+            delay_data_path = os.path.join(BASE_DIR, 'static', 'data', 'delay')
+            f.write("scp " + host_vm + ":~/ping_output.csv " + delay_data_path + "\n")
+            
+        
+        #############run local.sh in server####################
+        subprocess.check_call(["bash", local_file_name, str(vm_time_counter/2)])
+     
+     
+    #############################ADDED to pop up graph fast###########################################
+    request.session["empty"] = "no"
+    request.session["old"] = "delay"
+     
     args = {}
     args.update(csrf(request))
     
@@ -272,6 +304,7 @@ def delay (request, vm_select="vm1"):
         
     args ['vm_numbers'] = vm_tag
     args ['vm_select'] = vm_select
+    args ['first'] = first
     return render_to_response('delay.html',args)
     
     
@@ -282,6 +315,11 @@ def delay (request, vm_select="vm1"):
 #################################################################################
 
 def bandwidth (request, vm_select="vm1"):
+    
+    request.session["current"] = "bandwidth"
+    current = request.session["current"]
+    
+    old = request.session["old"]
     
     print "+++++++++++++++++++++++++"
     print vm_select
@@ -333,7 +371,7 @@ def bandwidth (request, vm_select="vm1"):
     vm_time_counter = float(request.session["vm_time_counter"])
 
     #################construct remove_bandwidth_csv.sh shell script##############
-    if vm_select != vm_select_old or (vm_select == "vm1" and vm_select_old =="vm1" and vm_time_counter == 0.0):
+    if vm_select != vm_select_old or (vm_select == "vm1" and vm_select_old =="vm1" and vm_time_counter == 0.0) or current != old:
         request.session["vm_time_counter"] = str(0.0)
 
         if not os.path.exists(os.path.dirname(remove_file_name)):
@@ -346,106 +384,131 @@ def bandwidth (request, vm_select="vm1"):
         print remove_file_name
         subprocess.check_call(["bash", remove_file_name])
 
-    
-    #set global counter
-    vm_time_counter = float(request.session["vm_time_counter"])
-    vm_time_counter += 1
-    request.session["vm_time_counter"] = str(vm_time_counter)
-    
-    
-    #################construct remote.sh shell script########################
-    if not os.path.exists(os.path.dirname(remote_file_name)):
-        print "bandwidth_c.sh does not exist"
-        os.makedirs(os.path.dirname(remote_file_name))
-    with open(remote_file_name, "wb") as f:
-        print "rewrite bandwidth_c.sh==========================="
-        f.write("if [ -f bandwidth_output.csv ];\n")
-        f.write("then\n")
-        f.write("\techo \"File $FILE exists\"\n")
-        f.write("else\n")
-        f.write("\techo \"File $FILE does not exists\"\n")
-        text = "\techo \"Time,"
-        #f.write("\techo \"Time,vm2,vm3\" >> ping_output.csv\n")
 
-        i = 0
-        while(i < vm_total_num):
-            if(i!=vm_index):
-                text = text+"vm"+str(i+1)+","
-            i += 1
-        text = text[:-1]
-        text = text + "\" >> bandwidth_output.csv\n"
-        f.write(text)
-        
-        f.write("fi\n")
-        f.write("\n")
-        ###########need to change to loop structure#########
-        i = 0
-        bandwidth_list = []
-        while(i<vm_total_num):
-            if (i!= vm_index):  
-                f.write("vm"+str(i+1)+"_bw=$(iperf -c " + vm_set[i][0] + " -t 2|awk '/Mbits/ {print $8}')\n")
-                bandwidth_list.append("vm"+str(i+1)+"_bw")
-            i += 1   
-                
+    if (request.session["empty"] == "yes" or vm_select != vm_select_old or current != old):
+        print "inside if+++++++++++++++++++++++++"
+        first = "yes"
+        bandwidth_file_name = os.path.join(BASE_DIR, 'static', 'data', 'bandwidth', 'bandwidth_output.csv')
+        if not os.path.exists(os.path.dirname(bandwidth_file_name)):
+            os.makedirs(os.path.dirname(bandwidth_file_name))
+        with open(bandwidth_file_name, "wb") as f:
+            text = "Time,"    
+            i = 0
+            while(i < vm_total_num):
+                if(i!=vm_index):
+                    text = text+"vm"+str(i+1)+","
+                i += 1
+            text = text[:-1]
+            text = text + "\n"
+            f.write(text)
             
-        f.write("\n")
-        ####################################################
-        f.write("comma=\",\"\n")
-        #f.write("full=\"$1$comma$first_ping$comma$second_ping\"\n")
-        text2 = "full=\"$1$comma"
-        for bandwidth in bandwidth_list:
-            text2 = text2 + "$" + bandwidth + "$comma"
-        text2 = text2[:-6]
-        text2 = text2 + "\"\n"
-        f.write(text2)
-        f.write("echo $full >> bandwidth_output.csv\n")
-        
-    #################construct local.sh shell script########################
-    if not os.path.exists(os.path.dirname(local_file_name)):
-        print "local.sh does not exist"
-        os.makedirs(os.path.dirname(local_file_name))
-    with open(local_file_name, "wb") as f:
-        print "rewrite local.sh====================="
-        #f.write("ssh-keygen -R " + vm_set[vm_index][0] + "\n")
-        #f.write("ssh-keyscan -H " + vm_set[vm_index][0] + " >> ~/.ssh/known_hosts\n")
-        
-        #ssh leipeng@130.211.153.18 "iperf -s > out.log &" 
-        #ssh leipeng@130.211.164.2 "iperf -s > out.log &" 
-        
-        i = 0
-        while(i<vm_total_num):
-            if (i!= vm_index):
-                server_vm = vm_set[i][1]+ "@" +vm_set[i][0]  
-                f.write("ssh " + server_vm + " \"iperf -s > out.log &\"\n")
-            i += 1   
-        
-        
-        f.write("\n")
+    else:
+        first = "no"
 
-        #ssh leipeng@130.211.163.194 'bash -s' < bandwidth_c.sh $1 
-        host_vm = vm_set[vm_index][1]+"@"+vm_set[vm_index][0]
-        f.write("ssh " + host_vm +" 'bash -s' < "+ remote_file_name +" $1\n")
-        f.write("\n")
+        #set global counter
+        vm_time_counter = float(request.session["vm_time_counter"])
+        vm_time_counter += 1
+        request.session["vm_time_counter"] = str(vm_time_counter)
         
-        #scp leipeng@130.211.163.194:~/bandwidth_output.csv ~/monitor/bandwidth/
-
-        bandwidth_data_path = os.path.join(BASE_DIR, 'static', 'data', 'bandwidth')
-        f.write("scp " + host_vm + ":~/bandwidth_output.csv " + bandwidth_data_path + "\n")
-        f.write("\n")
-
-        #ssh leipeng@130.211.153.18 "ps -ef | grep 'iperf' | awk '{print \$2}' | xargs kill" 
-        #ssh leipeng@130.211.164.2 "ps -ef | grep 'iperf' | awk '{print \$2}' | xargs kill" 
-        '''
-        i = 0
-        while(i<vm_total_num):
-            if (i!= vm_index):
-                server_vm = vm_set[i][1]+ "@" +vm_set[i][0]  
-                f.write("ssh " + server_vm + " \"ps -ef | grep 'iperf' | awk '{print \$2}' | xargs kill\"\n")
-            i += 1 
-        '''
-    #############run local.sh in server####################
-    subprocess.check_call(["bash", local_file_name, str(vm_time_counter/2)])
+        
+        #################construct remote.sh shell script########################
+        if not os.path.exists(os.path.dirname(remote_file_name)):
+            print "bandwidth_c.sh does not exist"
+            os.makedirs(os.path.dirname(remote_file_name))
+        with open(remote_file_name, "wb") as f:
+            print "rewrite bandwidth_c.sh==========================="
+            f.write("if [ -f bandwidth_output.csv ];\n")
+            f.write("then\n")
+            f.write("\techo \"File $FILE exists\"\n")
+            f.write("else\n")
+            f.write("\techo \"File $FILE does not exists\"\n")
+            text = "\techo \"Time,"
+            #f.write("\techo \"Time,vm2,vm3\" >> ping_output.csv\n")
+    
+            i = 0
+            while(i < vm_total_num):
+                if(i!=vm_index):
+                    text = text+"vm"+str(i+1)+","
+                i += 1
+            text = text[:-1]
+            text = text + "\" >> bandwidth_output.csv\n"
+            f.write(text)
+            
+            f.write("fi\n")
+            f.write("\n")
+            ###########need to change to loop structure#########
+            i = 0
+            bandwidth_list = []
+            while(i<vm_total_num):
+                if (i!= vm_index):  
+                    f.write("vm"+str(i+1)+"_bw=$(iperf -c " + vm_set[i][0] + " -t 1|awk '/Mbits/ {print $8}')\n")
+                    bandwidth_list.append("vm"+str(i+1)+"_bw")
+                i += 1   
+                    
+                
+            f.write("\n")
+            ####################################################
+            f.write("comma=\",\"\n")
+            #f.write("full=\"$1$comma$first_ping$comma$second_ping\"\n")
+            text2 = "full=\"$1$comma"
+            for bandwidth in bandwidth_list:
+                text2 = text2 + "$" + bandwidth + "$comma"
+            text2 = text2[:-6]
+            text2 = text2 + "\"\n"
+            f.write(text2)
+            f.write("echo $full >> bandwidth_output.csv\n")
+            
+        #################construct local.sh shell script########################
+        if not os.path.exists(os.path.dirname(local_file_name)):
+            print "local.sh does not exist"
+            os.makedirs(os.path.dirname(local_file_name))
+        with open(local_file_name, "wb") as f:
+            print "rewrite local.sh====================="
+            #f.write("ssh-keygen -R " + vm_set[vm_index][0] + "\n")
+            #f.write("ssh-keyscan -H " + vm_set[vm_index][0] + " >> ~/.ssh/known_hosts\n")
+            
+            #ssh leipeng@130.211.153.18 "iperf -s > out.log &" 
+            #ssh leipeng@130.211.164.2 "iperf -s > out.log &" 
+            
+            i = 0
+            while(i<vm_total_num):
+                if (i!= vm_index):
+                    server_vm = vm_set[i][1]+ "@" +vm_set[i][0]  
+                    f.write("ssh " + server_vm + " \"iperf -s > out.log &\"\n")
+                i += 1   
+            
+            
+            f.write("\n")
+    
+            #ssh leipeng@130.211.163.194 'bash -s' < bandwidth_c.sh $1 
+            host_vm = vm_set[vm_index][1]+"@"+vm_set[vm_index][0]
+            f.write("ssh " + host_vm +" 'bash -s' < "+ remote_file_name +" $1\n")
+            f.write("\n")
+            
+            #scp leipeng@130.211.163.194:~/bandwidth_output.csv ~/monitor/bandwidth/
+    
+            bandwidth_data_path = os.path.join(BASE_DIR, 'static', 'data', 'bandwidth')
+            f.write("scp " + host_vm + ":~/bandwidth_output.csv " + bandwidth_data_path + "\n")
+            f.write("\n")
+    
+            #ssh leipeng@130.211.153.18 "ps -ef | grep 'iperf' | awk '{print \$2}' | xargs kill" 
+            #ssh leipeng@130.211.164.2 "ps -ef | grep 'iperf' | awk '{print \$2}' | xargs kill" 
+            '''
+            i = 0
+            while(i<vm_total_num):
+                if (i!= vm_index):
+                    server_vm = vm_set[i][1]+ "@" +vm_set[i][0]  
+                    f.write("ssh " + server_vm + " \"ps -ef | grep 'iperf' | awk '{print \$2}' | xargs kill\"\n")
+                i += 1 
+            '''
+        #############run local.sh in server####################
+        subprocess.check_call(["bash", local_file_name, str(vm_time_counter/2)])
  
+ 
+    request.session["empty"] = "no"
+    request.session["old"] = "bandwidth"
+    
+    
     args = {}
     args.update(csrf(request))
     
@@ -459,6 +522,8 @@ def bandwidth (request, vm_select="vm1"):
         
     args ['vm_numbers'] = vm_tag
     args ['vm_select'] = vm_select
+    args ['first'] = first
+
     return render_to_response('bandwidth.html',args)
 
 #################################################################################
@@ -468,6 +533,11 @@ def bandwidth (request, vm_select="vm1"):
 #################################################################################
 
 def packet_loss (request, vm_select="vm1"):
+    
+    request.session["current"] = "packet_loss"
+    current = request.session["current"]
+    
+    old = request.session["old"]
     
     print "+++++++++++++++++++++++++"
     print vm_select
@@ -520,7 +590,7 @@ def packet_loss (request, vm_select="vm1"):
     vm_time_counter = float(request.session["vm_time_counter"])
 
     #################construct remove_lost_csv.sh shell script##############
-    if vm_select != vm_select_old or (vm_select == "vm1" and vm_select_old =="vm1" and vm_time_counter == 0.0):
+    if vm_select != vm_select_old or (vm_select == "vm1" and vm_select_old =="vm1" and vm_time_counter == 0.0) or current != old:
         request.session["vm_time_counter"] = str(0.0)
 
         if not os.path.exists(os.path.dirname(remove_file_name)):
@@ -533,99 +603,121 @@ def packet_loss (request, vm_select="vm1"):
         print remove_file_name
         subprocess.check_call(["bash", remove_file_name])
 
-    
-    #set global counter
-    vm_time_counter = float(request.session["vm_time_counter"])
-    vm_time_counter += 1
-    request.session["vm_time_counter"] = str(vm_time_counter)
-    
-    
-    #################construct remote.sh shell script########################
-    if not os.path.exists(os.path.dirname(remote_file_name)):
-        print "lost_c.sh does not exist"
-        os.makedirs(os.path.dirname(remote_file_name))
-    with open(remote_file_name, "wb") as f:
-        print "rewrite lost_c.sh==========================="
-        f.write("if [ -f lost_output.csv ];\n")
-        f.write("then\n")
-        f.write("\techo \"File $FILE exists\"\n")
-        f.write("else\n")
-        f.write("\techo \"File $FILE does not exists\"\n")
-        text = "\techo \"Time,"
-        #f.write("\techo \"Time,vm2,vm3\" >> ping_output.csv\n")
 
-        i = 0
-        while(i < vm_total_num):
-            if(i!=vm_index):
-                text = text+"vm"+str(i+1)+","
-            i += 1
-        text = text[:-1]
-        text = text + "\" >> lost_output.csv\n"
-        f.write(text)
+    if (request.session["empty"] == "yes" or vm_select != vm_select_old or current != old):
+        print "inside if+++++++++++++++++++++++++"
+        first = "yes"
+        loss_file_name = os.path.join(BASE_DIR, 'static', 'data', 'packetLoss', 'lost_output.csv')
+        if not os.path.exists(os.path.dirname(loss_file_name)):
+            os.makedirs(os.path.dirname(loss_file_name))
+        with open(loss_file_name, "wb") as f:
+            text = "Time,"    
+            i = 0
+            while(i < vm_total_num):
+                if(i!=vm_index):
+                    text = text+"vm"+str(i+1)+","
+                i += 1
+            text = text[:-1]
+            text = text + "\n"
+            f.write(text)
         
-        f.write("fi\n")
-        f.write("\n")
-        ###########need to change to loop structure#########
-        #first_lost=$(iperf -c 130.211.153.18 -u -b 10m -l 60 -t 1 -r |awk '/%/ {print $0}'|head -1|cut -d "(" -f2 | cut -d ")" -f1 |sed 's/\%//g')
-        #second_lost=$(iperf -c 130.211.164.2 -u -b 10m -l 60 -t 1 -r |awk '/%/ {print $0}'|head -1|cut -d "(" -f2 | cut -d ")" -f1 |sed 's/\%//g')
+    else:
+        first = "old"
+        #set global counter
+        vm_time_counter = float(request.session["vm_time_counter"])
+        vm_time_counter += 1
+        request.session["vm_time_counter"] = str(vm_time_counter)
         
-        i = 0
-        lost_list = []
-        while(i<vm_total_num):
-            if (i!= vm_index):  
-                f.write("vm"+str(i+1)+"_lost=$(iperf -c " + vm_set[i][0] + " -u -b 10m -l 1000 -t 1 -r |awk '/%/ {print $0}'|head -1|cut -d \"(\" -f2 | cut -d \")\" -f1 |sed 's/\%//g')\n")
-                lost_list.append("vm"+str(i+1)+"_lost")
-            i += 1   
-                
+        
+        #################construct remote.sh shell script########################
+        if not os.path.exists(os.path.dirname(remote_file_name)):
+            print "lost_c.sh does not exist"
+            os.makedirs(os.path.dirname(remote_file_name))
+        with open(remote_file_name, "wb") as f:
+            print "rewrite lost_c.sh==========================="
+            f.write("if [ -f lost_output.csv ];\n")
+            f.write("then\n")
+            f.write("\techo \"File $FILE exists\"\n")
+            f.write("else\n")
+            f.write("\techo \"File $FILE does not exists\"\n")
+            text = "\techo \"Time,"
+            #f.write("\techo \"Time,vm2,vm3\" >> ping_output.csv\n")
+    
+            i = 0
+            while(i < vm_total_num):
+                if(i!=vm_index):
+                    text = text+"vm"+str(i+1)+","
+                i += 1
+            text = text[:-1]
+            text = text + "\" >> lost_output.csv\n"
+            f.write(text)
             
-        f.write("\n")
-        ####################################################
-        f.write("comma=\",\"\n")
-        #f.write("full=\"$1$comma$first_ping$comma$second_ping\"\n")
-        text2 = "full=\"$1$comma"
-        for lost in lost_list:
-            text2 = text2 + "$" + lost + "$comma"
-        text2 = text2[:-6]
-        text2 = text2 + "\"\n"
-        f.write(text2)
-        f.write("echo $full >> lost_output.csv\n")
-        
-    #################construct local.sh shell script########################
-    if not os.path.exists(os.path.dirname(local_file_name)):
-        print "local.sh does not exist"
-        os.makedirs(os.path.dirname(local_file_name))
-    with open(local_file_name, "wb") as f:
-        print "rewrite local.sh====================="
-        #f.write("ssh-keygen -R " + vm_set[vm_index][0] + "\n")
-        #f.write("ssh-keyscan -H " + vm_set[vm_index][0] + " >> ~/.ssh/known_hosts\n")
-        
-        #ssh leipeng@130.211.153.18 "iperf -s > out.log &" 
-        #ssh leipeng@130.211.164.2 "iperf -s > out.log &" 
-        
-        i = 0
-        while(i<vm_total_num):
-            if (i!= vm_index):
-                server_vm = vm_set[i][1]+ "@" +vm_set[i][0]  
-                f.write("ssh " + server_vm + " \"iperf -s -u > out.log &\"\n")
-            i += 1   
-        
-        
-        f.write("\n")
-
-        #ssh leipeng@130.211.163.194 'bash -s' < bandwidth_c.sh $1 
-        host_vm = vm_set[vm_index][1]+"@"+vm_set[vm_index][0]
-        f.write("ssh " + host_vm +" 'bash -s' < "+ remote_file_name +" $1\n")
-        f.write("\n")
-        
-        #scp leipeng@130.211.163.194:~/bandwidth_output.csv ~/monitor/bandwidth/
-
-        lost_data_path = os.path.join(BASE_DIR, 'static', 'data', 'packetLoss')
-        f.write("scp " + host_vm + ":~/lost_output.csv " + lost_data_path + "\n")
-        f.write("\n")
-
-        
-    #############run local.sh in server####################
-    subprocess.check_call(["bash", local_file_name, str(vm_time_counter/2)])
+            f.write("fi\n")
+            f.write("\n")
+            ###########need to change to loop structure#########
+            #first_lost=$(iperf -c 130.211.153.18 -u -b 10m -l 60 -t 1 -r |awk '/%/ {print $0}'|head -1|cut -d "(" -f2 | cut -d ")" -f1 |sed 's/\%//g')
+            #second_lost=$(iperf -c 130.211.164.2 -u -b 10m -l 60 -t 1 -r |awk '/%/ {print $0}'|head -1|cut -d "(" -f2 | cut -d ")" -f1 |sed 's/\%//g')
+            
+            i = 0
+            lost_list = []
+            while(i<vm_total_num):
+                if (i!= vm_index):  
+                    f.write("vm"+str(i+1)+"_lost=$(iperf -c " + vm_set[i][0] + " -u -b 2m -l 100 -t 1 -r |awk '/%/ {print $0}'|head -1|cut -d \"(\" -f2 | cut -d \")\" -f1 |sed 's/\%//g')\n")
+                    lost_list.append("vm"+str(i+1)+"_lost")
+                i += 1   
+                    
+                
+            f.write("\n")
+            ####################################################
+            f.write("comma=\",\"\n")
+            #f.write("full=\"$1$comma$first_ping$comma$second_ping\"\n")
+            text2 = "full=\"$1$comma"
+            for lost in lost_list:
+                text2 = text2 + "$" + lost + "$comma"
+            text2 = text2[:-6]
+            text2 = text2 + "\"\n"
+            f.write(text2)
+            f.write("echo $full >> lost_output.csv\n")
+            
+        #################construct local.sh shell script########################
+        if not os.path.exists(os.path.dirname(local_file_name)):
+            print "local.sh does not exist"
+            os.makedirs(os.path.dirname(local_file_name))
+        with open(local_file_name, "wb") as f:
+            print "rewrite local.sh====================="
+            #f.write("ssh-keygen -R " + vm_set[vm_index][0] + "\n")
+            #f.write("ssh-keyscan -H " + vm_set[vm_index][0] + " >> ~/.ssh/known_hosts\n")
+            
+            #ssh leipeng@130.211.153.18 "iperf -s > out.log &" 
+            #ssh leipeng@130.211.164.2 "iperf -s > out.log &" 
+            
+            i = 0
+            while(i<vm_total_num):
+                if (i!= vm_index):
+                    server_vm = vm_set[i][1]+ "@" +vm_set[i][0]  
+                    f.write("ssh " + server_vm + " \"iperf -s -u > out.log &\"\n")
+                i += 1   
+            
+            
+            f.write("\n")
+    
+            #ssh leipeng@130.211.163.194 'bash -s' < bandwidth_c.sh $1 
+            host_vm = vm_set[vm_index][1]+"@"+vm_set[vm_index][0]
+            f.write("ssh " + host_vm +" 'bash -s' < "+ remote_file_name +" $1\n")
+            f.write("\n")
+            
+            #scp leipeng@130.211.163.194:~/bandwidth_output.csv ~/monitor/bandwidth/
+    
+            lost_data_path = os.path.join(BASE_DIR, 'static', 'data', 'packetLoss')
+            f.write("scp " + host_vm + ":~/lost_output.csv " + lost_data_path + "\n")
+            f.write("\n")
+    
+            
+        #############run local.sh in server####################
+        subprocess.check_call(["bash", local_file_name, str(vm_time_counter/2)])
+     
+    request.session["empty"] = "no"
+    request.session["old"] = "packet_loss"
  
     args = {}
     args.update(csrf(request))
@@ -640,5 +732,7 @@ def packet_loss (request, vm_select="vm1"):
         
     args ['vm_numbers'] = vm_tag
     args ['vm_select'] = vm_select
+
+    args ['first'] = first
     return render_to_response('packet_loss.html',args)
 
